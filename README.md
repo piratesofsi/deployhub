@@ -1,36 +1,11 @@
-```markdown
+````markdown
 # DeployHub
 
-A cloud-based web application deployment platform inspired by modern platforms such as Vercel.
+A cloud-based web application deployment platform inspired by modern deployment platforms such as Vercel.
 
 DeployHub accepts a Git repository URL, processes the application through a distributed deployment pipeline, builds it, and serves the resulting application.
 
 > **Status:** In active development
-
----
-
-## Table of Contents
-
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-- [Current Implementation](#current-implementation)
-- [Deployment Flow](#deployment-flow)
-- [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-  - [Upload Service](#upload-service)
-    - [Installation](#installation)
-    - [Environment Variables](#environment-variables)
-    - [Running the Service](#running-the-service)
-- [API Reference](#api-reference)
-  - [Deploy Repository](#1-deploy-repository)
-  - [Get Deployment Status](#2-get-deployment-status)
-- [Storage & State Management](#storage--state-management)
-  - [Cloudflare R2 Storage Format](#cloudflare-r2-storage-format)
-  - [Redis Architecture](#redis-architecture)
-- [Roadmap](#roadmap)
-- [Objective](#objective)
-
----
 
 ## Architecture
 
@@ -70,10 +45,7 @@ DeployHub accepts a Git repository URL, processes the application through a dist
                          ┌──────────────────┐
                          │ Deployed Output  │
                          └──────────────────┘
-
-```
-
----
+````
 
 ## Project Structure
 
@@ -98,10 +70,7 @@ deployhub/
 │
 ├── .gitignore
 └── README.md
-
 ```
-
----
 
 ## Current Implementation
 
@@ -118,162 +87,151 @@ The upload service currently handles:
 * Tracking deployment status using Redis
 * Providing a deployment status endpoint
 
----
-
-## Deployment Flow
+### Deployment Flow
 
 ```text
 Git Repository
-      │
-      ▼
+      |
+      v
 POST /deploy
-      │
-      ▼
+      |
+      v
 Generate Deployment ID
-      │
-      ▼
+      |
+      v
 Clone Repository
-      │
-      ▼
+      |
+      v
 Traverse Repository
-      │
-      ▼
+      |
+      v
 Upload Files to Cloudflare R2
-      │
-      ▼
+      |
+      v
 Add Deployment ID to Redis Queue
-      │
-      ▼
+      |
+      v
 Store Deployment Status
-
 ```
-
----
 
 ## Tech Stack
 
 ### Backend
 
-* **Node.js**
-* **TypeScript**
-* **Express.js**
-* **simple-git**
+* Node.js
+* TypeScript
+* Express.js
+* simple-git
 
 ### Storage
 
-* **Cloudflare R2**
-* **AWS SDK for JavaScript** (*Cloudflare R2 is accessed through its S3-compatible API*)
+* Cloudflare R2
+* AWS SDK for JavaScript
+
+Cloudflare R2 is accessed through its S3-compatible API.
 
 ### Queue and State Management
 
-* **Redis** (Used for deployment queues and deployment status tracking)
+* Redis
+
+Redis is used for:
+
+* Deployment queues
+* Deployment status tracking
 
 ### Frontend
 
-* **React**
-* **TypeScript**
-* **Tailwind CSS** (*Currently under development*)
+* React
+* TypeScript
+* Tailwind CSS
 
----
+The frontend is planned and currently under development.
 
-## Getting Started
+## Upload Service
 
-### Upload Service
-
-#### Installation
+### Installation
 
 ```bash
 cd upload-service
 npm install
-
 ```
 
-#### Environment Variables
+### Environment Variables
 
-Create a `.env` file inside the `upload-service` directory:
+Create a `.env` file inside `upload-service`:
 
 ```env
 R2_ACCOUNT_ID=your_account_id
 R2_ACCESS_KEY_ID=your_access_key
 R2_SECRET_ACCESS_KEY=your_secret_key
 R2_BUCKET_NAME=deploy-hub
-
 ```
 
-> **Warning:** Do not commit `.env` or expose your R2 credentials.
+Do not commit `.env` or expose your R2 credentials.
 
-#### Running the Service
+### Running the Service
 
 ```bash
 npm run dev
-
 ```
 
-The service runs on: [http://localhost:3000](http://localhost:3000)
+The service runs on:
 
----
+```text
+http://localhost:3000
+```
 
-## API Reference
+## API
 
-### 1. Deploy Repository
+### Deploy
 
-Initiates a deployment pipeline for a remote Git repository.
+```http
+POST /deploy
+```
 
-* **Endpoint:** `POST /deploy`
-* **Headers:** `Content-Type: application/json`
-
-**Request Body:**
+Request:
 
 ```json
 {
-  "repoUrl": "[https://github.com/username/project](https://github.com/username/project)"
+  "repoUrl": "https://github.com/username/project"
 }
-
 ```
 
-**Response:**
+Response:
 
 ```json
 {
   "id": "im299"
 }
-
 ```
 
-> The deployment ID is used throughout the pipeline to identify a specific deployment.
+The deployment ID is used throughout the deployment pipeline to identify a specific deployment.
 
----
+### Deployment Status
 
-### 2. Get Deployment Status
+```http
+GET /status?id=<deployment-id>
+```
 
-Retrieves the current status of a deployment.
+Example:
 
-* **Endpoint:** `GET /status`
-* **Query Parameters:** `id=<deployment-id>`
-
-**Example Request:**
-
-```text
+```http
 GET /status?id=im299
-
 ```
 
-**Response:**
+Response:
 
 ```json
 {
   "status": "uploaded"
 }
-
 ```
 
----
+## Cloudflare R2
 
-## Storage & State Management
+Source files are stored using the deployment ID as an object-key prefix.
 
-### Cloudflare R2 Storage Format
-
-Source files are stored using the deployment ID as an object-key prefix:
+For example:
 
 ```text
 deploy-hub/
@@ -283,46 +241,41 @@ deploy-hub/
     ├── style.css
     └── src/
         └── app.js
-
 ```
 
-This ensures different deployments maintain isolated file spaces.
+This allows different deployments to maintain their own isolated set of files.
 
----
+## Redis
 
-### Redis Architecture
+Redis is used as the communication and state layer between deployment services.
 
-Redis acts as the communication and state layer between distributed deployment services.
+### Build Queue
 
-#### Build Queue
-
-Deployment IDs are pushed into a Redis List named `buildQueue`:
+Deployment IDs are added to a Redis List:
 
 ```text
 buildQueue
-    │
+    |
     ├── im299
     ├── abc123
     └── xyz789
-
 ```
 
-The build service consumes deployment IDs from this queue sequentially for processing.
+The build service will consume deployment IDs from this queue and process them.
 
-#### Deployment Status
+### Deployment Status
 
-Deployment states are stored in a Redis Hash named `status`:
+Deployment states are stored in a Redis Hash:
 
 ```text
+status
+
 im299   -> uploaded
 abc123  -> building
 xyz789  -> deployed
-
 ```
 
-Status updates can be retrieved using the `/status` API endpoint.
-
----
+The status can be retrieved through the `/status` endpoint.
 
 ## Roadmap
 
@@ -343,11 +296,11 @@ Status updates can be retrieved using the `/status` API endpoint.
 * [ ] Error handling and cleanup
 * [ ] Production deployment
 
----
-
 ## Objective
 
-The project is focused on understanding the core architecture and engineering concepts behind modern cloud deployment platforms, including:
+The project is focused on understanding the architecture and engineering concepts behind cloud deployment platforms.
+
+Key areas include:
 
 * Service-oriented architecture
 * Asynchronous job processing
@@ -359,12 +312,11 @@ The project is focused on understanding the core architecture and engineering co
 * Application routing
 * Cloud infrastructure
 
----
-
 ## Project Status
 
-DeployHub is currently under active development. The upload service, Cloudflare R2 integration, and initial Redis pipeline are fully functional. The build service, request handler, and frontend dashboard are currently in active development.
+DeployHub is currently under active development.
+
+The upload service, Cloudflare R2 integration, and initial Redis pipeline are functional. The build service, request handler, and frontend are being developed as the project progresses.
 
 ```
-
 ```
