@@ -1,68 +1,62 @@
+Yep. I'd make it cleaner and more understated — no emojis, no unnecessary marketing language, and focused on the engineering behind DeployHub.
+
 ````markdown
-# DeployHub 🚀
+# DeployHub
 
-A cloud-based web application deployment platform inspired by modern deployment platforms like Vercel.
+A cloud-based web application deployment platform inspired by modern deployment platforms such as Vercel.
 
-DeployHub allows users to provide a Git repository URL and prepares the application for deployment through a distributed deployment pipeline.
+DeployHub accepts a Git repository, processes the application through a distributed deployment pipeline, builds it, and serves the resulting application.
 
-> 🚧 **Project Status:** Under active development
+> **Status:** In active development
 
----
-
-## 🏗️ Architecture
-
-DeployHub is being built as a service-oriented deployment platform.
+## Architecture
 
 ```text
-                     ┌─────────────────┐
-                     │    Frontend     │
-                     └────────┬────────┘
-                              │
-                              ▼
-                     ┌─────────────────┐
-                     │ Request Handler │
-                     └────────┬────────┘
-                              │
-                              ▼
-                     ┌─────────────────┐
-                     │ Upload Service  │
-                     └──────┬─────┬────┘
-                            │     │
-                     Clone  │     │ Upload
-                            │     ▼
-                            │  ┌─────────────┐
-                            │  │ Cloudflare  │
-                            │  │     R2      │
-                            │  └─────────────┘
-                            │
-                            ▼
-                     ┌─────────────────┐
-                     │      Redis      │
-                     │   Build Queue   │
-                     └────────┬────────┘
-                              │
-                              ▼
-                     ┌─────────────────┐
-                     │  Build Service  │
-                     └────────┬────────┘
-                              │
-                              ▼
-                     ┌─────────────────┐
-                     │     Deployed    │
-                     │      App        │
-                     └─────────────────┘
+                         ┌──────────────────┐
+                         │     Frontend     │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │ Request Handler  │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │  Upload Service  │
+                         └───────┬───┬──────┘
+                                 │   │
+                     Clone       │   │ Upload
+                                 │   ▼
+                                 │ ┌──────────────┐
+                                 │ │ Cloudflare R2│
+                                 │ └──────────────┘
+                                 │
+                                 ▼
+                         ┌──────────────────┐
+                         │      Redis       │
+                         │   Build Queue    │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │  Build Service   │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │ Deployed Output  │
+                         └──────────────────┘
 ````
 
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```text
 deployhub/
 │
-├── frontend/              # Deployment dashboard (planned)
+├── frontend/
 │
-├── upload-service/        # Handles repository upload pipeline
+├── upload-service/
 │   ├── src/
 │   │   ├── index.ts
 │   │   ├── file.ts
@@ -72,61 +66,57 @@ deployhub/
 │   ├── package-lock.json
 │   └── tsconfig.json
 │
-├── build-service/         # Builds submitted applications (planned)
+├── build-service/
 │
-├── request-handler/       # Serves deployed applications (planned)
+├── request-handler/
 │
 ├── .gitignore
 └── README.md
 ```
 
----
-
-## ⚙️ Current Implementation
+## Current Implementation
 
 ### Upload Service
 
-The upload service currently supports:
+The upload service currently handles:
 
-* Accepting a Git repository URL through `/deploy`
+* Receiving a Git repository URL
 * Generating a unique deployment ID
-* Cloning repositories using `simple-git`
+* Cloning the repository using `simple-git`
 * Recursively traversing repository files
-* Uploading files to Cloudflare R2
-* Storing deployment IDs in a Redis build queue
-* Tracking deployment status using Redis hashes
-* Checking deployment status through `/status`
+* Uploading source files to Cloudflare R2
+* Adding deployments to a Redis build queue
+* Tracking deployment status using Redis
+* Providing a deployment status endpoint
 
-### Current Flow
+### Deployment Flow
 
 ```text
-GitHub Repository
-       │
-       ▼
+Git Repository
+      |
+      v
 POST /deploy
-       │
-       ▼
+      |
+      v
 Generate Deployment ID
-       │
-       ▼
+      |
+      v
 Clone Repository
-       │
-       ▼
-Traverse Files
-       │
-       ▼
-Upload Files → Cloudflare R2
-       │
-       ▼
-Push Deployment ID → Redis
-       │
-       ▼
-Store Status → Redis
+      |
+      v
+Traverse Repository
+      |
+      v
+Upload Files to Cloudflare R2
+      |
+      v
+Add Deployment ID to Redis Queue
+      |
+      v
+Store Deployment Status
 ```
 
----
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Backend
 
@@ -138,11 +128,18 @@ Store Status → Redis
 ### Storage
 
 * Cloudflare R2
-* AWS SDK for JavaScript (S3-compatible API)
+* AWS SDK for JavaScript
 
-### Queue & State
+Cloudflare R2 is accessed through its S3-compatible API.
+
+### Queue and State Management
 
 * Redis
+
+Redis is used for:
+
+* Deployment queues
+* Deployment status tracking
 
 ### Frontend
 
@@ -150,11 +147,9 @@ Store Status → Redis
 * TypeScript
 * Tailwind CSS
 
-> Frontend implementation is planned.
+The frontend is planned and currently under development.
 
----
-
-## 🚀 Upload Service
+## Upload Service
 
 ### Installation
 
@@ -174,9 +169,9 @@ R2_SECRET_ACCESS_KEY=your_secret_key
 R2_BUCKET_NAME=deploy-hub
 ```
 
-Do **not** commit your `.env` file.
+Do not commit `.env` or expose your R2 credentials.
 
-### Run
+### Running the Service
 
 ```bash
 npm run dev
@@ -188,9 +183,7 @@ The service runs on:
 http://localhost:3000
 ```
 
----
-
-## 📡 API
+## API
 
 ### Deploy
 
@@ -214,11 +207,9 @@ Response:
 }
 ```
 
-The deployment ID is used to identify the deployment throughout the pipeline.
+The deployment ID is used throughout the deployment pipeline to identify a specific deployment.
 
----
-
-### Check Deployment Status
+### Deployment Status
 
 ```http
 GET /status?id=<deployment-id>
@@ -238,13 +229,11 @@ Response:
 }
 ```
 
----
+## Cloudflare R2
 
-## ☁️ Cloudflare R2
+Source files are stored using the deployment ID as an object-key prefix.
 
-Deployment source files are stored in Cloudflare R2 using the deployment ID as an object-key prefix.
-
-Example:
+For example:
 
 ```text
 deploy-hub/
@@ -256,21 +245,25 @@ deploy-hub/
         └── app.js
 ```
 
-This allows multiple deployments to coexist independently.
+This allows different deployments to maintain their own isolated set of files.
 
----
+## Redis
 
-## 🔄 Redis
-
-Redis is currently used for two purposes.
+Redis is used as the communication and state layer between deployment services.
 
 ### Build Queue
 
-Deployment IDs are pushed into a Redis List:
+Deployment IDs are added to a Redis List:
 
 ```text
-buildQueue → [deployment-id]
+buildQueue
+    |
+    ├── im299
+    ├── abc123
+    └── xyz789
 ```
+
+The build service will consume deployment IDs from this queue and process them.
 
 ### Deployment Status
 
@@ -278,24 +271,23 @@ Deployment states are stored in a Redis Hash:
 
 ```text
 status
-├── im299 → uploaded
-├── abc123 → building
-└── xyz789 → deployed
+
+im299   -> uploaded
+abc123  -> building
+xyz789  -> deployed
 ```
 
-The build service will consume deployment IDs from the queue and update their status as the deployment progresses.
+The status can be retrieved through the `/status` endpoint.
 
----
+## Roadmap
 
-## 🗺️ Roadmap
-
-* [x] Git repository upload
-* [x] Repository file traversal
+* [x] Git repository cloning
+* [x] Recursive file traversal
 * [x] Cloudflare R2 integration
-* [x] Redis connection
-* [x] Redis build queue
+* [x] Redis integration
+* [x] Deployment queue
 * [x] Deployment status tracking
-* [ ] Build worker
+* [ ] Build service
 * [ ] Application build pipeline
 * [ ] Build logs
 * [ ] Request handler
@@ -303,18 +295,18 @@ The build service will consume deployment IDs from the queue and update their st
 * [ ] Deployment history
 * [ ] Frontend dashboard
 * [ ] Custom deployment domains
-* [ ] Improved error handling
+* [ ] Error handling and cleanup
 * [ ] Production deployment
 
----
+## Objective
 
-## 🎯 Goal
+The project is focused on understanding the architecture and engineering concepts behind cloud deployment platforms.
 
-The goal of DeployHub is to understand and implement the core concepts behind modern cloud deployment platforms, including:
+Key areas include:
 
 * Service-oriented architecture
 * Asynchronous job processing
-* Message queues
+* Redis-based queues
 * Object storage
 * Build workers
 * Deployment isolation
@@ -322,13 +314,13 @@ The goal of DeployHub is to understand and implement the core concepts behind mo
 * Application routing
 * Cloud infrastructure
 
----
-
-## 📌 Project Status
+## Project Status
 
 DeployHub is currently under active development.
 
-The **upload-service and initial Redis/R2 pipeline are functional**, while the build, routing, and frontend services are being developed.
+The upload service, Cloudflare R2 integration, and initial Redis pipeline are functional. The build service, request handler, and frontend are being developed as the project progresses.
 
 ```
+
+This feels much more like **your GitHub project README** rather than a generated tutorial README: straightforward, technical, and it documents what you've actually built so far.
 ```
