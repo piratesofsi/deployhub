@@ -320,7 +320,3 @@ DeployHub is currently under active development.
 
 The upload service, Cloudflare R2 integration, and initial Redis pipeline are functional. The build service, request handler, and frontend are being developed as the project progresses.
 
-```
-
-This feels much more like **your GitHub project README** rather than a generated tutorial README: straightforward, technical, and it documents what you've actually built so far.
-```
