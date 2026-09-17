@@ -1,3 +1,5 @@
+
+
 ````markdown
 # DeployHub
 
@@ -45,15 +47,13 @@ DeployHub accepts a Git repository URL, processes the application through a dist
                          ┌──────────────────┐
                          │ Deployed Output  │
                          └──────────────────┘
-````
+```
 
 ## Project Structure
 
 ```text
 deployhub/
-│
 ├── frontend/
-│
 ├── upload-service/
 │   ├── src/
 │   │   ├── index.ts
@@ -63,11 +63,8 @@ deployhub/
 │   ├── package.json
 │   ├── package-lock.json
 │   └── tsconfig.json
-│
 ├── build-service/
-│
 ├── request-handler/
-│
 ├── .gitignore
 └── README.md
 ```
@@ -78,14 +75,14 @@ deployhub/
 
 The upload service currently handles:
 
-* Receiving a Git repository URL
-* Generating a unique deployment ID
-* Cloning the repository using `simple-git`
-* Recursively traversing repository files
-* Uploading source files to Cloudflare R2
-* Adding deployments to a Redis build queue
-* Tracking deployment status using Redis
-* Providing a deployment status endpoint
+- Receiving a Git repository URL
+- Generating a unique deployment ID
+- Cloning the repository using `simple-git`
+- Recursively traversing repository files
+- Uploading source files to Cloudflare R2
+- Adding deployments to a Redis build queue
+- Tracking deployment status using Redis
+- Providing a deployment status endpoint
 
 ### Deployment Flow
 
@@ -118,32 +115,32 @@ Store Deployment Status
 
 ### Backend
 
-* Node.js
-* TypeScript
-* Express.js
-* simple-git
+- Node.js
+- TypeScript
+- Express.js
+- simple-git
 
 ### Storage
 
-* Cloudflare R2
-* AWS SDK for JavaScript
+- Cloudflare R2
+- AWS SDK for JavaScript
 
 Cloudflare R2 is accessed through its S3-compatible API.
 
 ### Queue and State Management
 
-* Redis
+- Redis
 
 Redis is used for:
 
-* Deployment queues
-* Deployment status tracking
+- Deployment queues
+- Deployment status tracking
 
 ### Frontend
 
-* React
-* TypeScript
-* Tailwind CSS
+- React
+- TypeScript
+- Tailwind CSS
 
 The frontend is planned and currently under development.
 
@@ -279,22 +276,22 @@ The status can be retrieved through the `/status` endpoint.
 
 ## Roadmap
 
-* [x] Git repository cloning
-* [x] Recursive file traversal
-* [x] Cloudflare R2 integration
-* [x] Redis integration
-* [x] Deployment queue
-* [x] Deployment status tracking
-* [ ] Build service
-* [ ] Application build pipeline
-* [ ] Build logs
-* [ ] Request handler
-* [ ] Deployment URLs
-* [ ] Deployment history
-* [ ] Frontend dashboard
-* [ ] Custom deployment domains
-* [ ] Error handling and cleanup
-* [ ] Production deployment
+- [x] Git repository cloning
+- [x] Recursive file traversal
+- [x] Cloudflare R2 integration
+- [x] Redis integration
+- [x] Deployment queue
+- [x] Deployment status tracking
+- [ ] Build service
+- [ ] Application build pipeline
+- [ ] Build logs
+- [ ] Request handler
+- [ ] Deployment URLs
+- [ ] Deployment history
+- [ ] Frontend dashboard
+- [ ] Custom deployment domains
+- [ ] Error handling and cleanup
+- [ ] Production deployment
 
 ## Objective
 
@@ -302,21 +299,19 @@ The project is focused on understanding the architecture and engineering concept
 
 Key areas include:
 
-* Service-oriented architecture
-* Asynchronous job processing
-* Redis-based queues
-* Object storage
-* Build workers
-* Deployment isolation
-* Build status tracking
-* Application routing
-* Cloud infrastructure
+- Service-oriented architecture
+- Asynchronous job processing
+- Redis-based queues
+- Object storage
+- Build workers
+- Deployment isolation
+- Build status tracking
+- Application routing
+- Cloud infrastructure
 
 ## Project Status
 
 DeployHub is currently under active development.
 
 The upload service, Cloudflare R2 integration, and initial Redis pipeline are functional. The build service, request handler, and frontend are being developed as the project progresses.
-
-```
-```
+````
