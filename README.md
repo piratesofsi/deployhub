@@ -11,7 +11,6 @@ DeployHub accepts a Git repository, processes the application through a distribu
 
 ## Architecture
 
-```text
                          ┌──────────────────┐
                          │     Frontend     │
                          └────────┬─────────┘
