@@ -1,6 +1,3 @@
-
-
-````markdown
 # DeployHub
 
 A cloud-based web application deployment platform inspired by modern deployment platforms such as Vercel.
@@ -314,4 +311,3 @@ Key areas include:
 DeployHub is currently under active development.
 
 The upload service, Cloudflare R2 integration, and initial Redis pipeline are functional. The build service, request handler, and frontend are being developed as the project progresses.
-````
