@@ -2,7 +2,7 @@
 
 A cloud-based web application deployment platform inspired by modern deployment platforms such as Vercel.
 
-DeployHub accepts a Git repository URL, processes the application through a distributed deployment pipeline, builds it, and serves the resulting application.
+DeployHub accepts a Git repository URL, queues the deployment as an asynchronous job, builds the application inside an isolated Docker environment, stores the resulting build output in object storage, and serves the deployed application.
 
 > **Status:** In active development
 
@@ -13,58 +13,167 @@ DeployHub accepts a Git repository URL, processes the application through a dist
                          │     Frontend     │
                          └────────┬─────────┘
                                   │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Request Handler  │
-                         └────────┬─────────┘
-                                  │
+                                  │ repoUrl
                                   ▼
                          ┌──────────────────┐
                          │  Upload Service  │
-                         └───────┬───┬──────┘
-                                 │   │
-                     Clone       │   │ Upload
-                                 │   ▼
-                                 │ ┌──────────────┐
-                                 │ │ Cloudflare R2│
-                                 │ └──────────────┘
-                                 │
-                                 ▼
-                         ┌──────────────────┐
-                         │      Redis       │
-                         │   Build Queue    │
+                         │                  │
+                         │ Generate ID      │
+                         │ Create Job       │
+                         │ Queue Job        │
                          └────────┬─────────┘
                                   │
+                                  │ { id, repoUrl }
+                                  ▼
+                         ┌──────────────────┐
+                         │      Redis       │
+                         │                  │
+                         │   buildQueue     │
+                         │   deployment     │
+                         │     status       │
+                         └────────┬─────────┘
+                                  │
+                                  │ Consume Job
                                   ▼
                          ┌──────────────────┐
                          │  Build Service   │
                          └────────┬─────────┘
                                   │
                                   ▼
+                    ┌─────────────────────────┐
+                    │     Docker Container    │
+                    │                         │
+                    │     Clone Repository    │
+                    │     Install Dependencies│
+                    │     Run Build           │
+                    └────────────┬────────────┘
+                                 │
+                                 │ Build Output
+                                 ▼
                          ┌──────────────────┐
-                         │ Deployed Output  │
-                         └──────────────────┘
+                         │   Cloudflare R2  │
+                         │                  │
+                         │ Deployment Files │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │ Request Handler  │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                                Users
 ```
 
 ## Project Structure
 
 ```text
 deployhub/
+
 ├── frontend/
+│
 ├── upload-service/
 │   ├── src/
 │   │   ├── index.ts
-│   │   ├── file.ts
-│   │   ├── r2.ts
 │   │   └── utils.ts
 │   ├── package.json
 │   ├── package-lock.json
 │   └── tsconfig.json
+│
 ├── build-service/
+│
 ├── request-handler/
+│
 ├── .gitignore
 └── README.md
 ```
+
+## Architecture Overview
+
+DeployHub is designed as a service-oriented deployment pipeline.
+
+Each service has a specific responsibility:
+
+### Upload Service
+
+Responsible for accepting deployment requests and creating deployment jobs.
+
+The upload service:
+
+- Receives a Git repository URL
+- Generates a unique deployment ID
+- Creates a deployment job
+- Pushes the job to the Redis build queue
+- Tracks the initial deployment status
+- Provides a deployment status endpoint
+
+The upload service does **not** clone repositories or perform builds.
+
+### Build Service
+
+The build service consumes deployment jobs from Redis.
+
+For each job, it will:
+
+- Receive the deployment ID and repository URL
+- Create an isolated Docker container
+- Clone the repository inside the container
+- Install project dependencies
+- Run the application's build command
+- Collect the resulting build output
+- Upload the build output to Cloudflare R2
+- Update the deployment status
+- Clean up the build environment
+
+### Docker Build Environment
+
+User application code is executed inside isolated Docker containers.
+
+The container provides an isolated environment containing:
+
+- Repository files
+- Runtime dependencies
+- Build tools
+- Temporary build filesystem
+- Network and process isolation
+
+The repository is cloned inside the container rather than being permanently stored on the host machine.
+
+After the build completes, the container can be removed.
+
+### Cloudflare R2
+
+Cloudflare R2 is used as persistent object storage for deployment output.
+
+The intended storage structure is:
+
+```text
+deploy-hub/
+
+└── <deployment-id>/
+
+    ├── index.html
+    ├── assets/
+    │   ├── app.js
+    │   └── style.css
+    └── ...
+```
+
+Source repositories are not intended to be permanently stored in R2.
+
+Only the resulting deployable build output is stored.
+
+### Request Handler
+
+The request handler will be responsible for serving deployed applications.
+
+It will eventually:
+
+- Receive incoming deployment requests
+- Resolve deployment IDs
+- Retrieve deployment files from R2
+- Serve static assets
+- Route requests to the appropriate deployment
 
 ## Current Implementation
 
@@ -74,38 +183,61 @@ The upload service currently handles:
 
 - Receiving a Git repository URL
 - Generating a unique deployment ID
-- Cloning the repository using `simple-git`
-- Recursively traversing repository files
-- Uploading source files to Cloudflare R2
-- Adding deployments to a Redis build queue
-- Tracking deployment status using Redis
+- Creating a deployment job
+- Pushing deployment jobs to Redis
+- Tracking deployment status
 - Providing a deployment status endpoint
+
+A deployment job has the following structure:
+
+```json
+{
+  "id": "abc123",
+  "repoUrl": "https://github.com/username/project"
+}
+```
+
+The job is serialized and stored in the Redis build queue.
 
 ### Deployment Flow
 
 ```text
-Git Repository
-      |
-      v
+Git Repository URL
+        |
+        v
 POST /deploy
-      |
-      v
+        |
+        v
 Generate Deployment ID
-      |
-      v
-Clone Repository
-      |
-      v
-Traverse Repository
-      |
-      v
-Upload Files to Cloudflare R2
-      |
-      v
-Add Deployment ID to Redis Queue
-      |
-      v
-Store Deployment Status
+        |
+        v
+Create Deployment Job
+        |
+        | { id, repoUrl }
+        v
+Redis buildQueue
+        |
+        v
+Build Service
+        |
+        v
+Docker Container
+        |
+        ├── Clone Repository
+        ├── Install Dependencies
+        └── Run Build
+                 |
+                 v
+           Build Output
+                 |
+                 v
+            Cloudflare R2
+                 |
+                 v
+          Request Handler
+                 |
+                 v
+               Users
 ```
 
 ## Tech Stack
@@ -115,7 +247,14 @@ Store Deployment Status
 - Node.js
 - TypeScript
 - Express.js
+- Redis
 - simple-git
+
+### Build Infrastructure
+
+- Docker
+- Docker containers
+- Git
 
 ### Storage
 
@@ -126,12 +265,13 @@ Cloudflare R2 is accessed through its S3-compatible API.
 
 ### Queue and State Management
 
-- Redis
+Redis is used as the communication and state layer between deployment services.
 
-Redis is used for:
+Redis provides:
 
-- Deployment queues
+- Deployment job queues
 - Deployment status tracking
+- Communication between services
 
 ### Frontend
 
@@ -195,11 +335,13 @@ Response:
 
 ```json
 {
-  "id": "im299"
+  "id": "abc123"
 }
 ```
 
 The deployment ID is used throughout the deployment pipeline to identify a specific deployment.
+
+The request only queues the deployment. Repository cloning and application building are handled by the build service.
 
 ### Deployment Status
 
@@ -210,104 +352,178 @@ GET /status?id=<deployment-id>
 Example:
 
 ```http
-GET /status?id=im299
+GET /status?id=abc123
 ```
 
 Response:
 
 ```json
 {
-  "status": "uploaded"
+  "response": "queued"
 }
 ```
 
-## Cloudflare R2
-
-Source files are stored using the deployment ID as an object-key prefix.
-
-For example:
+Deployment states will eventually include states such as:
 
 ```text
-deploy-hub/
-└── im299/
-    ├── index.html
-    ├── package.json
-    ├── style.css
-    └── src/
-        └── app.js
+queued
+building
+built
+deployed
+failed
 ```
-
-This allows different deployments to maintain their own isolated set of files.
 
 ## Redis
 
-Redis is used as the communication and state layer between deployment services.
+Redis acts as the communication and state layer between the deployment services.
 
 ### Build Queue
 
-Deployment IDs are added to a Redis List:
+Deployment jobs are stored in a Redis List named `buildQueue`.
+
+Example:
 
 ```text
 buildQueue
-    |
-    ├── im299
-    ├── abc123
-    └── xyz789
+
+┌─────────────────────────────────────────────────────────┐
+│ {"id":"abc123","repoUrl":"https://github.com/user/app"} │
+│ {"id":"xyz789","repoUrl":"https://github.com/user/web"} │
+└─────────────────────────────────────────────────────────┘
 ```
 
-The build service will consume deployment IDs from this queue and process them.
+The upload service adds jobs to the queue.
+
+The build service will consume jobs from the queue.
 
 ### Deployment Status
 
-Deployment states are stored in a Redis Hash:
+Deployment states are stored in a Redis Hash named `status`.
+
+Example:
 
 ```text
 status
 
-im299   -> uploaded
-abc123  -> building
-xyz789  -> deployed
+abc123  -> queued
+xyz789  -> building
+pqr456  -> deployed
 ```
 
 The status can be retrieved through the `/status` endpoint.
 
+## Build Pipeline
+
+The planned build pipeline is:
+
+```text
+Redis Job
+    |
+    v
+Build Service
+    |
+    v
+Create Docker Container
+    |
+    v
+Clone Repository
+    |
+    v
+Install Dependencies
+    |
+    v
+Run Build Command
+    |
+    v
+Collect Build Output
+    |
+    v
+Upload Output to R2
+    |
+    v
+Update Deployment Status
+    |
+    v
+Destroy Container
+```
+
+The source repository and temporary dependencies only need to exist during the build process.
+
+## Scalability
+
+DeployHub uses asynchronous job processing to separate deployment requests from application builds.
+
+The upload service does not perform resource-intensive builds. Instead, it places deployment jobs into Redis and immediately returns a deployment ID.
+
+This allows build workers to operate independently.
+
+Multiple build service instances can consume jobs from the same queue:
+
+```text
+                    Redis
+                 buildQueue
+                     |
+        ┌────────────┼────────────┐
+        │            │            │
+        ▼            ▼            ▼
+   Build Worker  Build Worker  Build Worker
+        │            │            │
+     Docker       Docker       Docker
+   Container     Container     Container
+```
+
+This architecture allows build capacity to be increased independently of the API layer.
+
+The current implementation is intended as a learning-focused foundation and is not yet production-ready.
+
 ## Roadmap
 
-- [x] Git repository cloning
-- [x] Recursive file traversal
-- [x] Cloudflare R2 integration
+- [x] Git repository URL handling
+- [x] Deployment ID generation
 - [x] Redis integration
-- [x] Deployment queue
+- [x] Redis deployment queue
 - [x] Deployment status tracking
+- [x] Upload service
 - [ ] Build service
+- [ ] Redis job consumer
+- [ ] Docker-based isolated builds
 - [ ] Application build pipeline
+- [ ] Build output upload to R2
 - [ ] Build logs
+- [ ] Build failure handling
+- [ ] Container cleanup
 - [ ] Request handler
 - [ ] Deployment URLs
 - [ ] Deployment history
 - [ ] Frontend dashboard
 - [ ] Custom deployment domains
-- [ ] Error handling and cleanup
 - [ ] Production deployment
+- [ ] Monitoring and observability
 
 ## Objective
 
-The project is focused on understanding the architecture and engineering concepts behind cloud deployment platforms.
+The project focuses on understanding the architecture and engineering concepts behind modern cloud deployment platforms.
 
 Key areas include:
 
 - Service-oriented architecture
 - Asynchronous job processing
 - Redis-based queues
+- Worker architecture
+- Docker-based build isolation
 - Object storage
-- Build workers
-- Deployment isolation
-- Build status tracking
+- Build pipelines
+- Deployment status tracking
 - Application routing
 - Cloud infrastructure
+- Scalable service design
 
 ## Project Status
 
 DeployHub is currently under active development.
 
-The upload service, Cloudflare R2 integration, and initial Redis pipeline are functional. The build service, request handler, and frontend are being developed as the project progresses.
+The upload service and initial Redis-based deployment pipeline are functional.
+
+The next stage is implementing the build service, Redis job consumer, and Docker-based isolated build environment.
+
+The request handler, frontend, deployment routing, and production infrastructure will be developed as the project progresses.
