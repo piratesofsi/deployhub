@@ -1,92 +1,103 @@
-import express, { response } from "express"
-import { generate } from "./utils.js";
-import fs from "fs/promises";
-import { simpleGit } from "simple-git";
-import { getAllFiles } from "./file.js"
-import { r2 } from "../src/r2.js"
-import { Bucket$, PutObjectCommand } from "@aws-sdk/client-s3";
-import path from "path";
-import { createClient } from "redis";
+import express from "express"
 import cors from "cors"
+import dotenv from "dotenv"
+import { generate } from "./utils.js";
+import { createClient } from "redis";
 
 
-
+dotenv.config();
 const app = express();
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 
-// app.get("/welcome",(req,res)=>{
-//     res.send({message:"hello"})
-// })
 
-const redisClient  = createClient();
-await redisClient.connect();
 
-// now design an endpoint which user hits to send the url
+// we need to create redis-client 
+const publisher = createClient();
+
+publisher.on("error", (error) => {
+    console.error("redisErorr:", error);
+})
+// now connect the client to the redis server 
+await publisher.connect();
+
+
+
+// so we need to get the repoUrl and then generate unique id and js pass it to the redis 
 app.post("/deploy", async (req, res) => {
-    const repoUrl = req.body.repoUrl;
+    try {
+        const repoUrl = req.body.repoUrl;
 
-    // generate a unique id for each deployment : can be done using uuid 
-    const id = generate();
+        if (!repoUrl) {
+            res.status(400).json({ error: "repoUrl is required" });
+            return;
+        }
 
-    // use simple-git to clone the repo and save it in output in this upload-service dirz
-    await fs.mkdir("/tmp/deployments", { recursive: true });
+        const id = generate();
 
-    const outputPath = `/tmp/deployments/${id}`;
+        const job = {
+            id,
+            repoUrl
+        }
 
-    await simpleGit().clone(repoUrl, outputPath);
+        await publisher.lPush(
+            "buildQueue",
+            JSON.stringify(job)
 
-
-
-    const files: string[] = await getAllFiles(outputPath);
-
-
-    // now upload file to the s3 bucket 
-    for (const file of files) {
-        const relativePath = path.relative(outputPath, file);
-
-        const fileContent = await fs.readFile(file);
-
-
-        await r2.send(
-            new PutObjectCommand({
-                Bucket: process.env.R2_BUCKET_NAME!,
-                Key: `${id}/${relativePath}`,
-                Body: fileContent,
-            })
         );
 
-        console.log(`Uploaded: ${relativePath}`);
+        await publisher.hSet(
+            "status",
+            id,
+            "queued"
+        )
+
+        console.log(`deployment queued for id : ${id}`);
+
+        res.json({
+            id,
+        })
+
+
+    }
+    catch (e) {
+        console.error("Failed to queue deployment:", e);
+
+        res.status(500).json({
+            error: "Failed to create deployment",
+        });
+    }
+}
+
+)
+
+app.get("/status", async (req, res) => {
+    try {
+        const id = req.query.id as string;
+
+        if (!id) {
+            res.status(400).json({
+                error: "Deployment Id is required"
+            });
+            return;
+        }
+
+        const response = await publisher.hGet("status", id);
+
+        res.json({
+            response
+        });
+    }
+    catch (e) {
+        console.error("Failed to get deployment status:", e);
+
+        res.status(500).json({
+            error: "Failed to get deployment status",
+        });
     }
 
-    //  put deployment in the redis queue 
-    await redisClient.lPush("buildQueue",id);
-    // stores deployment status js like hashmap id  -> status
-    await redisClient.hSet("status",id,"uploaded");
-
-    res.json({
-        id
-    });
-
-
-
-
 })
-
-app.get("/status",async (req,res)=>{
-    const id = req.body.id;
-    
-    const status = await redisClient.hGet("status",id);
-
-    res.json({
-        status
-    })
-
-})
-
-
 
 app.listen(3000, () => {
-    console.log("server started")
-});
-
+    console.log(`server started at Port:${process.env.PORT}`)
+})
