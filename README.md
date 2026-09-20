@@ -1,6 +1,3 @@
-Got you. **One single outer `markdown` code block, from `# DeployHub` all the way to the end.** No splitting. Copy button copies the entire README.
-
-````markdown
 # DeployHub
 
 A cloud-based web application deployment platform inspired by modern deployment platforms such as Vercel.
@@ -72,7 +69,7 @@ DeployHub accepts a Git repository URL, queues the deployment as an asynchronous
                                   │
                                   ▼
                                 Users
-````
+```
 
 ## Project Structure
 
@@ -1114,6 +1111,3 @@ Browser
 The core static deployment architecture is functional.
 
 The next stage is improving reliability, deployment status handling, build failure handling, production infrastructure, and eventually supporting server-side applications.
-
-```
-```
