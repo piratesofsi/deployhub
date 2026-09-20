@@ -7,24 +7,31 @@ import path from "node:path";
 const app = express();
 app.use(express.json());
 
-app.get("/:deployementId/*path", async (req, res) => {
-    const id = req.params.deployementId;
-    const filePath = req.params.path.join("/");
 
-    console.log(id);
-    console.log(filePath);
+// /ug67s → /ug67s/index.html
+app.get("/:deploymentId", (req, res) => {
+    const id = req.params.deploymentId;
 
-    // res.send(`requesting deployment: ${id}`);
-    // res.json({ message: `requesting deployment : ${id}` })
+    res.redirect(`/${id}/index.html`);
+});
 
-    // will construct key to get the folder of the deployement 
+
+app.get("/:deploymentId/*path", async (req, res) => {
+    const id = req.params.deploymentId;
+
+    let filePath = req.params.path.join("/");
+
+    if (!filePath) {
+        filePath = "index.html";
+    }
+
+    console.log("deployment:", id);
+    console.log("file:", filePath);
+
     const key = `output/${id}/${filePath}`;
 
     const object = await getObject(key);
 
-    console.log("object received from R2");
-
-    // res.send("file found in R2");
     const body = object.Body;
 
     if (!body) {
@@ -33,6 +40,28 @@ app.get("/:deployementId/*path", async (req, res) => {
     }
 
     const data = await body.transformToByteArray();
+
+    let content = Buffer.from(data);
+
+    /*
+     * The built website uses absolute asset paths:
+     *
+     * /assets/index.css
+     *
+     * Rewrite them so they include the deployment ID:
+     *
+     * /ug67s/assets/index.css
+     */
+    if (filePath === "index.html") {
+        const html = content.toString("utf-8");
+
+        const modifiedHtml = html.replace(
+            /(["'(])\/assets\//g,
+            `$1/${id}/assets/`
+        );
+
+        content = Buffer.from(modifiedHtml);
+    }
 
     const extension = path.extname(filePath);
 
@@ -54,9 +83,8 @@ app.get("/:deployementId/*path", async (req, res) => {
 
     res.setHeader("Content-Type", contentType);
 
-    res.end(Buffer.from(data));
-
-})
+    res.end(content);
+});
 
 const port = process.env.PORT || 4000;
 
