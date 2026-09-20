@@ -47,7 +47,7 @@ while (true) {
     console.log("id", job.id);
     console.log("repoUrl", job.repoUrl);
 
-    const command = `docker run -d --name ${job.id} deployhub-builder bash -c "git clone ${job.repoUrl} . && npm install && npm run build"`;
+    const command = `docker run -d --name ${job.id} deployhub-builder bash -c "git clone ${job.repoUrl} . && if [ -f package.json ]; then npm install && npm run build; else mkdir dist && find . -maxdepth 1 -mindepth 1 ! -name .git ! -name dist -exec cp -r {} dist/ \\;; fi"`;
 
     const containerId = (await runCommand(command)).trim();
     console.log("container started:", containerId);
